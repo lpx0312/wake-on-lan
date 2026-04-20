@@ -18,5 +18,4 @@ builds:
 archives:
   - id: default
     format: binary
-    binary: wake-on-lan
     files: []
