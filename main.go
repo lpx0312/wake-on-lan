@@ -3,11 +3,31 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"strings"
 )
 
 func main() {
-	fmt.Println("wake-on-lan v1.0.0")
+	if len(os.Args) != 2 {
+		fmt.Fprintf(os.Stderr, "Usage: %s <MAC_ADDRESS>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Example: %s 00:11:22:33:44:55\n", os.Args[0])
+		os.Exit(1)
+	}
+
+	macStr := os.Args[1]
+
+	mac, err := parseMAC(macStr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := sendWOL(mac); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Wake-on-LAN packet sent to %s\n", macStr)
 }
 
 // parseHexByte parses a 2-character hex string into a byte.
