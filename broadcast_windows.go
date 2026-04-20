@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 package main
 
@@ -8,14 +7,42 @@ import (
 	"syscall"
 )
 
-// enableBroadcast enables SO_BROADCAST on a UDPConn (Windows)
+// enableBroadcast enables SO_BROADCAST - no-op since we use raw socket
 func enableBroadcast(conn *net.UDPConn) error {
-	file, err := conn.File()
+	return nil
+}
+
+// sendWolBroadcast sends WOL packet using raw syscall on Windows
+func sendWolBroadcast(packet []byte, targetIP string, targetPort int) error {
+	// Create UDP socket
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_UDP)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer syscall.Closesocket(fd)
 
-	err = syscall.SetsockoptInt(syscall.Handle(file.Fd()), syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1)
-	return err
+	// Enable broadcast
+	const SOL_SOCKET = 0xffff
+	const SO_BROADCAST = 0x20
+	err = syscall.SetsockoptInt(fd, SOL_SOCKET, SO_BROADCAST, 1)
+	if err != nil {
+		return err
+	}
+
+	// Parse target IP
+	ip := net.ParseIP(targetIP)
+	if ip == nil {
+		return &net.ParseError{Type: "IP address", Text: targetIP}
+	}
+
+	// Create sockaddr
+	addr := syscall.SockaddrInet4{Port: targetPort}
+	copy(addr.Addr[:], ip.To4())
+
+	// Send
+	err = syscall.Sendto(fd, packet, 0, &addr)
+	if err != nil {
+		return err
+	}
+	return nil
 }

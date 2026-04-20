@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"strings"
 )
@@ -91,23 +90,6 @@ func createMagicPacket(mac []byte) []byte {
 func sendWOL(mac []byte) error {
 	packet := createMagicPacket(mac)
 
-	// Create UDP connection for broadcasting
-	conn, err := net.Dial("udp", "255.255.255.255:9")
-	if err != nil {
-		return fmt.Errorf("failed to create connection: %w", err)
-	}
-	defer conn.Close()
-
-	udpConn := conn.(*net.UDPConn)
-
-	// Enable broadcast on Windows
-	if err := enableBroadcast(udpConn); err != nil {
-		return fmt.Errorf("failed to enable broadcast: %w", err)
-	}
-
-	if _, err := udpConn.Write(packet); err != nil {
-		return fmt.Errorf("failed to send packet: %w", err)
-	}
-
-	return nil
+	// Use platform-specific implementation
+	return sendWolBroadcast(packet, "255.255.255.255", 9)
 }
