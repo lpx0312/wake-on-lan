@@ -1,0 +1,23 @@
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: wake-on-lan
+    dir: .
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+    binary: wake-on-lan
+
+archives:
+  - id: default
+    format: binary
+    format_overrides:
+      - goos: windows
+        format: zip
