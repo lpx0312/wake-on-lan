@@ -18,6 +18,5 @@ builds:
 archives:
   - id: default
     format: binary
-    format_overrides:
-      - goos: windows
-        format: zip
+    binary: wake-on-lan
+    files: []
