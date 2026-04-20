@@ -7,13 +7,18 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <MAC_ADDRESS>\n", os.Args[0])
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		fmt.Fprintf(os.Stderr, "Usage: %s <MAC_ADDRESS> [TARGET_IP]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Example: %s 00:11:22:33:44:55\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Example: %s 00:11:22:33:44:55 192.168.0.198\n", os.Args[0])
 		os.Exit(1)
 	}
 
 	macStr := os.Args[1]
+	targetIP := "255.255.255.255" // default broadcast
+	if len(os.Args) == 3 {
+		targetIP = os.Args[2]
+	}
 
 	mac, err := parseMAC(macStr)
 	if err != nil {
@@ -21,7 +26,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := sendWOL(mac); err != nil {
+	if err := sendWOL(mac, targetIP); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -87,9 +92,15 @@ func createMagicPacket(mac []byte) []byte {
 }
 
 // sendWOL sends a Wake-on-LAN magic packet to the specified MAC address.
-func sendWOL(mac []byte) error {
+func sendWOL(mac []byte, targetIP string) error {
 	packet := createMagicPacket(mac)
 
 	// Use platform-specific implementation
+	// Try direct target IP first, then fall back to broadcast
+	err := sendWolBroadcast(packet, targetIP, 9)
+	if err == nil {
+		return nil
+	}
+	// Fallback to standard broadcast address
 	return sendWolBroadcast(packet, "255.255.255.255", 9)
 }
