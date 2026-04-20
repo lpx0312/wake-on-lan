@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"syscall"
 )
 
 func main() {
@@ -91,18 +92,34 @@ func createMagicPacket(mac []byte) []byte {
 func sendWOL(mac []byte) error {
 	packet := createMagicPacket(mac)
 
-	conn, err := net.Dial("udp", "255.255.255.255:9")
+	// Use ListenUDP for better control over broadcast
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: 0})
 	if err != nil {
 		return fmt.Errorf("failed to create connection: %w", err)
 	}
-	defer func() {
-		_ = conn.Close()
-	}()
+	defer conn.Close()
 
-	udpConn := conn.(*net.UDPConn)
-	if _, err := udpConn.Write(packet); err != nil {
+	// Set broadcast permission (required on Windows)
+	if err := setBroadcast(conn); err != nil {
+		return fmt.Errorf("failed to enable broadcast: %w", err)
+	}
+
+	destAddr := &net.UDPAddr{IP: net.IPv4(255, 255, 255, 255), Port: 9}
+	if _, err := conn.WriteToUDP(packet, destAddr); err != nil {
 		return fmt.Errorf("failed to send packet: %w", err)
 	}
 
 	return nil
+}
+
+// setBroadcast enables SO_BROADCAST socket option
+func setBroadcast(conn *net.UDPConn) error {
+	file, err := conn.File()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Enable broadcast
+	return syscall.SetsockoptInt(syscall.Handle(file.Fd()), syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1)
 }
