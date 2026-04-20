@@ -1,0 +1,11 @@
+# Binaries
+*.exe
+wake-on-lan.exe
+wol.exe
+
+# Test files
+test_*.go
+debug.go
+
+# Build artifacts
+dist/

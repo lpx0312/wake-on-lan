@@ -11,14 +11,21 @@
 ### 从源码构建
 
 ```bash
-go install
+git clone https://github.com/lpx0312/wake-on-lan.git
+cd wake-on-lan
+go build -o wake-on-lan.exe .
 ```
 
 ## 使用
 
 ```bash
-wake-on-lan <MAC_ADDRESS>
+wake-on-lan <MAC_ADDRESS> [TARGET_IP]
 ```
+
+### 参数说明
+
+- `MAC_ADDRESS` (必需) - 要唤醒的目标机器 MAC 地址
+- `TARGET_IP` (可选) - 目标机器的 IP 地址。使用单播传输更可靠。如果省略，则使用广播地址 `255.255.255.255`
 
 ### 支持的 MAC 地址格式
 
@@ -29,7 +36,11 @@ wake-on-lan <MAC_ADDRESS>
 ### 示例
 
 ```bash
+# 使用广播唤醒（默认）
 wake-on-lan 00:11:22:33:44:55
+
+# 使用单播直接发送到目标 IP（更可靠）
+wake-on-lan 00:11:22:33:44:55 192.168.0.198
 ```
 
 ## 构建
