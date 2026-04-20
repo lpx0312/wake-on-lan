@@ -30,3 +30,29 @@ func TestParseMAC(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateMagicPacket(t *testing.T) {
+	mac := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+	packet := createMagicPacket(mac)
+
+	// 检查长度
+	if len(packet) != 102 {
+		t.Errorf("packet length = %d, expected 102", len(packet))
+	}
+
+	// 检查前6字节是 0xFF
+	for i := 0; i < 6; i++ {
+		if packet[i] != 0xFF {
+			t.Errorf("packet[%d] = %x, expected 0xFF", i, packet[i])
+		}
+	}
+
+	// 检查后96字节是16次MAC重复
+	for i := 0; i < 16; i++ {
+		for j := 0; j < 6; j++ {
+			if packet[6+i*6+j] != mac[j] {
+				t.Errorf("packet[%d] = %x, expected %x", 6+i*6+j, packet[6+i*6+j], mac[j])
+			}
+		}
+	}
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -51,4 +52,37 @@ func parseMAC(macStr string) ([]byte, error) {
 	}
 
 	return mac, nil
+}
+
+// createMagicPacket creates a Wake-on-LAN magic packet for the given MAC address.
+// Format: 6 bytes of 0xFF followed by 16 repetitions of the MAC address.
+func createMagicPacket(mac []byte) []byte {
+	packet := make([]byte, 102)
+	for i := 0; i < 6; i++ {
+		packet[i] = 0xFF
+	}
+	for i := 0; i < 16; i++ {
+		copy(packet[6+i*6:], mac)
+	}
+	return packet
+}
+
+// sendWOL sends a Wake-on-LAN magic packet to the specified MAC address.
+func sendWOL(mac []byte) error {
+	packet := createMagicPacket(mac)
+
+	conn, err := net.Dial("udp", "255.255.255.255:9")
+	if err != nil {
+		return fmt.Errorf("failed to create connection: %w", err)
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	udpConn := conn.(*net.UDPConn)
+	if _, err := udpConn.Write(packet); err != nil {
+		return fmt.Errorf("failed to send packet: %w", err)
+	}
+
+	return nil
 }
