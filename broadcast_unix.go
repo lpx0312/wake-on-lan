@@ -15,7 +15,9 @@ func enableBroadcast(conn *net.UDPConn) error {
 // sendWolBroadcast sends WOL packet using raw syscall on Unix
 func sendWolBroadcast(packet []byte, targetIP string, targetPort int) error {
 	// Create UDP socket
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_UDP)
+	// Use protocol=0 (instead of IPPROTO_UDP) because some Linux kernels
+	// reject explicit IPPROTO_UDP on SOCK_DGRAM with "protocol not available"
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
 	if err != nil {
 		return err
 	}
