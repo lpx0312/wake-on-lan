@@ -1,23 +1,60 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 )
 
+func printHelp() {
+	fmt.Println("Usage: wake-on-lan -m <MAC_ADDRESS> [-t TARGET_IP]")
+	fmt.Println()
+	fmt.Println("Send a Wake-on-LAN magic packet to wake up a remote machine.")
+	fmt.Println()
+	fmt.Println("Options:")
+	fmt.Println("  -m, --mac    MAC address of target machine (required)")
+	fmt.Println("              Supported formats: 00:11:22:33:44:55 | 00-11-22-33-44-55 | 001122334455")
+	fmt.Println("  -t, --target IP address to send packet to (optional, default: 255.255.255.255 broadcast)")
+	fmt.Println("              Use unicast IP when broadcast is blocked on the network.")
+	fmt.Println("  -h, --help   Show this help message")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  wake-on-lan -m 00:11:22:33:44:55")
+	fmt.Println("  wake-on-lan --mac 00:11:22:33:44:55 --target 192.168.0.198")
+}
+
 func main() {
-	if len(os.Args) < 2 || len(os.Args) > 3 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <MAC_ADDRESS> [TARGET_IP]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Example: %s 00:11:22:33:44:55\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Example: %s 00:11:22:33:44:55 192.168.0.198\n", os.Args[0])
+	// Check for help flag before parsing (avoids "required flag" errors)
+	for _, arg := range os.Args[1:] {
+		if arg == "-h" || arg == "--help" {
+			printHelp()
+			os.Exit(0)
+		}
+	}
+
+	macFlag := flag.String("m", "", "MAC address of target machine")
+	macFlagLong := flag.String("mac", "", "MAC address of target machine (long form)")
+	targetFlag := flag.String("t", "", "Target IP address")
+	targetFlagLong := flag.String("target", "", "Target IP address (long form)")
+	flag.Parse()
+
+	if *macFlag == "" && *macFlagLong == "" {
+		fmt.Fprintf(os.Stderr, "Error: -m/--mac is required\n")
 		os.Exit(1)
 	}
 
-	macStr := os.Args[1]
-	targetIP := "255.255.255.255" // default broadcast
-	if len(os.Args) == 3 {
-		targetIP = os.Args[2]
+	macStr := *macFlag
+	if macStr == "" {
+		macStr = *macFlagLong
+	}
+
+	targetIP := "255.255.255.255"
+	if *targetFlag != "" {
+		targetIP = *targetFlag
+	} else if *targetFlagLong != "" {
+		targetIP = *targetFlagLong
 	}
 
 	mac, err := parseMAC(macStr)
@@ -26,12 +63,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := sendWOL(mac, targetIP); err != nil {
+	// Print which broadcast implementation is active
+	fmt.Printf("[%s] broadcast implementation: ", runtime.GOOS)
+	if runtime.GOOS == "windows" {
+		fmt.Println("net.DialUDP")
+	} else {
+		fmt.Println("syscall.Socket + SO_BROADCAST")
+	}
+
+	usedIP, err := sendWOL(mac, targetIP)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Wake-on-LAN packet sent to %s\n", macStr)
+	if usedIP == "255.255.255.255" {
+		fmt.Printf("Wake-on-LAN packet sent via broadcast (%s) for MAC %s\n", usedIP, macStr)
+	} else {
+		fmt.Printf("Wake-on-LAN packet sent to %s (MAC: %s)\n", usedIP, macStr)
+	}
 }
 
 // parseHexByte parses a 2-character hex string into a byte.
@@ -92,15 +142,15 @@ func createMagicPacket(mac []byte) []byte {
 }
 
 // sendWOL sends a Wake-on-LAN magic packet to the specified MAC address.
-func sendWOL(mac []byte, targetIP string) error {
+// Returns the actual IP address the packet was sent to (may differ from targetIP on fallback).
+func sendWOL(mac []byte, targetIP string) (string, error) {
 	packet := createMagicPacket(mac)
 
-	// Use platform-specific implementation
-	// Try direct target IP first, then fall back to broadcast
 	err := sendWolBroadcast(packet, targetIP, 9)
 	if err == nil {
-		return nil
+		return targetIP, nil
 	}
 	// Fallback to standard broadcast address
-	return sendWolBroadcast(packet, "255.255.255.255", 9)
+	err = sendWolBroadcast(packet, "255.255.255.255", 9)
+	return "255.255.255.255", err
 }
